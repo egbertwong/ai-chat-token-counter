@@ -28,11 +28,12 @@ function getTextsFromPage(): string[] {
 }
 
 // ---------- 顶部按钮 + Radix 风格菜单 ----------
-let mounted = false;
+
+// 按钮 / 文本
 let buttonEl: HTMLButtonElement | null = null;
 let labelSpan: HTMLSpanElement | null = null;
 
-// 菜单相关节点
+// 菜单相关
 let popperWrapper: HTMLDivElement | null = null;
 let menuContent: HTMLDivElement | null = null;
 let charsItem: HTMLDivElement | null = null;
@@ -41,9 +42,8 @@ let encoderItem: HTMLDivElement | null = null;
 let switchItem: HTMLDivElement | null = null;
 
 function createMenuDom() {
-  if (popperWrapper) return;
+  if (popperWrapper && document.body.contains(popperWrapper)) return;
 
-  // 外层 wrapper：position fixed + data-radix-popper-content-wrapper
   popperWrapper = document.createElement("div");
   popperWrapper.setAttribute("data-radix-popper-content-wrapper", "");
   popperWrapper.dir = "ltr";
@@ -56,7 +56,6 @@ function createMenuDom() {
   popperWrapper.style.willChange = "transform";
   popperWrapper.style.display = "none";
 
-  // 内层菜单 content：仿你给的 class，并统一文字样式为 text-sm
   menuContent = document.createElement("div");
   menuContent.setAttribute("data-side", "bottom");
   menuContent.setAttribute("data-align", "end");
@@ -131,20 +130,16 @@ function createMenuDom() {
 function openMenu() {
   if (!buttonEl || !popperWrapper || !menuContent) return;
 
-  // 先显示，让浏览器计算宽度
   popperWrapper.style.display = "block";
 
   const btnRect = buttonEl.getBoundingClientRect();
   const menuRect = menuContent.getBoundingClientRect();
 
-  // 默认：左对齐按钮
   let x = btnRect.left;
   const y = btnRect.bottom + 4;
 
   const vw = window.innerWidth;
   const margin = 8;
-
-  // 如果右侧会超出屏幕，往左挪
   if (x + menuRect.width + margin > vw) {
     x = Math.max(margin, vw - menuRect.width - margin);
   }
@@ -169,11 +164,17 @@ function toggleMenu() {
   }
 }
 
+// 每次调用都检查 header / button 是否还在 DOM 中，如果没有就重新挂载
 function ensureUiMounted() {
-  if (mounted) return;
-
   const bar = document.querySelector<HTMLElement>("#conversation-header-actions");
-  if (!bar) return;
+  if (!bar) {
+    buttonEl = null;
+    labelSpan = null;
+    return;
+  }
+
+  // 如果按钮已经在 DOM 里，什么都不做
+  if (buttonEl && buttonEl.isConnected) return;
 
   const wrapper = document.createElement("div");
   wrapper.className = "flex items-center";
@@ -192,7 +193,7 @@ function ensureUiMounted() {
   chevron.style.fontSize = "10px";
 
   btn.appendChild(label);
-//   btn.appendChild(chevron);
+  // btn.appendChild(chevron);
   buttonEl = btn;
 
   btn.addEventListener("click", (ev) => {
@@ -204,16 +205,20 @@ function ensureUiMounted() {
   wrapper.appendChild(btn);
   bar.prepend(wrapper);
 
-  // 点击别处关闭
-  document.addEventListener("click", (ev) => {
-    if (!popperWrapper || !buttonEl) return;
-    const target = ev.target as Node;
-    if (!popperWrapper.contains(target) && !buttonEl.contains(target)) {
-      closeMenu();
-    }
-  });
+  // 点击别处关闭菜单（只绑定一次）
+  // @ts-ignore
+  if (!(document as any).__tokenCounterClickBound) {
+    document.addEventListener("click", (ev) => {
+      if (!popperWrapper || !buttonEl) return;
+      const target = ev.target as Node;
+      if (!popperWrapper.contains(target) && !buttonEl.contains(target)) {
+        closeMenu();
+      }
+    });
+    // @ts-ignore
+    (document as any).__tokenCounterClickBound = true;
+  }
 
-  // 滚动 / resize 时，如果菜单开着，就重新定位
   const reposition = () => {
     if (popperWrapper && popperWrapper.style.display === "block") {
       openMenu();
@@ -221,8 +226,6 @@ function ensureUiMounted() {
   };
   window.addEventListener("scroll", reposition, { passive: true });
   window.addEventListener("resize", reposition, { passive: true });
-
-  mounted = true;
 }
 
 // ---------- 统计 & 渲染 ----------
@@ -241,7 +244,7 @@ function computeAndRender() {
     lastRun = now;
 
     ensureUiMounted();
-    if (!mounted) return;
+    if (!buttonEl) return;
 
     const encoder = getEncoder(currentEnc);
     const texts = getTextsFromPage();
@@ -267,26 +270,54 @@ function computeAndRender() {
   }
 }
 
-// ---------- DOM 变化：只读，触发重算 ----------
+// ---------- DOM 变化：监听 #page-header 的下一个兄弟 ----------
 function getObserveTarget(): Node {
-  // id 为 page-header 的标签
   const header = document.querySelector<HTMLElement>("#page-header");
-  // 并行的下一个标签作为监听目标
   if (header && header.nextElementSibling) {
     return header.nextElementSibling;
   }
-  // 兜底：找不到就先监听 body，避免完全不工作
   return document.body;
 }
 
-const mo = new MutationObserver(() => scheduleCompute(300));
-mo.observe(getObserveTarget(), {
-  childList: true,
-  subtree: true,
-  characterData: true,
+let observeTarget: Node | null = null;
+
+const mo = new MutationObserver(() => {
+  scheduleCompute(300);
+  updateObserverTarget();
 });
 
-window.addEventListener("scroll", () => scheduleCompute(500), { passive: true });
-window.addEventListener("resize", () => scheduleCompute(500), { passive: true });
+function updateObserverTarget() {
+  const newTarget = getObserveTarget();
+  if (observeTarget === newTarget) return;
+  observeTarget = newTarget;
+  mo.disconnect();
+  mo.observe(observeTarget, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+}
 
+// ---------- URL 变化监听：/c/xxxxx 切换对话 ----------
+let lastHref = location.href;
+
+function onUrlChange() {
+  // 路由变化时，重置引用并重绑定 observer
+  buttonEl = null;
+  labelSpan = null;
+  closeMenu();
+  updateObserverTarget();
+  scheduleCompute(0);
+}
+
+setInterval(() => {
+  const href = location.href;
+  if (href !== lastHref) {
+    lastHref = href;
+    onUrlChange();
+  }
+}, 500);
+
+// 初始化
+updateObserverTarget();
 scheduleCompute(0);
