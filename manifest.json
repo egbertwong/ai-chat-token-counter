@@ -1,0 +1,23 @@
+{
+    "manifest_version": 3,
+    "name": "ChatGPT Token Counter (tiktoken compatible)",
+    "version": "1.0.0",
+    "description": "Count tokens on ChatGPT web using js-tiktoken (o200k_base / cl100k_base).", 
+    "content_scripts": [
+        {
+            "matches": [
+                "https://chat.openai.com/*",
+                "https://chatgpt.com/*"
+            ],
+            "js": [
+                "dist/content.js"
+            ],
+            "run_at": "document_end"
+        }
+    ],
+    "permissions": [],
+    "host_permissions": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+    ]
+}
