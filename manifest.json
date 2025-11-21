@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "ChatGPT Token Counter (tiktoken compatible)",
+    "name": "ChatGPT Token Counter",
     "version": "1.0.0",
     "description": "Count tokens on ChatGPT web using js-tiktoken (o200k_base / cl100k_base).", 
     "content_scripts": [
