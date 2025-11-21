@@ -4,6 +4,7 @@ const KEY = "egbertw_token_encoder";
 const BUTTON_ID = "token-counter-button";
 const WRAPPER_ID = "token-counter-wrapper";
 const LABEL_ATTRIBUTE = "data-token-counter-label";
+const DEBUG_LOG = false;
 type EncoderName = "o200k_base" | "cl100k_base";
 
 let currentEnc: EncoderName =
@@ -20,13 +21,17 @@ function getEncoder(name: EncoderName) {
 
 // ---------- 只读：抓页面对话文本 ----------
 function getTextsFromPage(): string[] {
-  const nodes = document.querySelectorAll(
-    "[data-message-author-role] .markdown, " +
-      "[data-message-author-role] .prose, " +
-      "[data-message-author-role]"
+  const nodes = document.querySelectorAll<HTMLElement>(
+    "[data-message-author-role]"
   );
   return Array.from(nodes)
-    .map((n) => (n.textContent || "").trim())
+    .map((n) => {
+      const inner =
+        n.querySelector<HTMLElement>(".markdown") ||
+        n.querySelector<HTMLElement>(".prose") ||
+        n;
+      return (inner.textContent || "").trim();
+    })
     .filter(Boolean);
 }
 
@@ -271,6 +276,17 @@ function computeAndRender() {
 
     const encoder = getEncoder(currentEnc);
     const texts = getTextsFromPage();
+    if (DEBUG_LOG) {
+      console.groupCollapsed("[TokenCounter] debug");
+      console.table(
+        texts.map((t, i) => ({
+          idx: i,
+          chars: t.length,
+          preview: t.slice(0, 60).replace(/\s+/g, " "),
+        }))
+      );
+      console.groupEnd();
+    }
     let total = 0;
 
     for (const t of texts) {
