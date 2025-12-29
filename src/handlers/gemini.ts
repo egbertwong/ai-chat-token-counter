@@ -6,7 +6,7 @@ const DEBUG_LOG = false;
 
 export class GeminiHandler implements TokenHandler {
     private tokenizer: any = null;
-    private containerEl: HTMLDivElement | null = null;
+    private containerEl: HTMLElement | null = null;
     private labelSpan: HTMLSpanElement | null = null;
     private timer: number | null = null;
     private lastRun = 0;
@@ -63,45 +63,71 @@ export class GeminiHandler implements TokenHandler {
     }
 
     private ensureUiMounted() {
-        const injectionPoint = document.querySelector(".input-area-container");
+        // 寻找注入点：Gemini 顶部的按钮容器
+        // 根据用户提供的片段，目标是一个包含 pillbox 或 studio-sidebar-button 的 .buttons-container
+        const headerButtons = document.querySelector(".buttons-container:has(.pillbox), .buttons-container:has(studio-sidebar-button)");
+        const injectionPoint = headerButtons || document.querySelector(".buttons-container");
+
         if (!injectionPoint) return;
 
         let existing = document.getElementById(BUTTON_ID);
         if (existing) {
-            this.containerEl = existing as HTMLDivElement;
+            this.containerEl = existing as HTMLElement;
             this.labelSpan = existing.querySelector(".token-label");
+            // 确保它在最前面
+            if (injectionPoint.firstChild !== existing) {
+                injectionPoint.insertBefore(existing, injectionPoint.firstChild);
+            }
             return;
         }
 
-        const container = document.createElement("div");
+        const container = document.createElement("button");
         container.id = BUTTON_ID;
-        container.style.display = "flex";
-        container.style.alignItems = "center";
-        container.style.padding = "4px 12px";
-        container.style.marginLeft = "8px";
-        container.style.backgroundColor = "#f0f4f9";
-        container.style.borderRadius = "16px";
-        container.style.fontFamily = '"Google Sans Flex", "Google Sans", sans-serif';
-        container.style.fontSize = "12px";
-        container.style.color = "#444746";
-        container.style.border = "1px solid #c4c7c5";
-        container.style.cursor = "default";
-        container.style.userSelect = "none";
-        container.style.transition = "background-color 0.2s";
+        container.type = "button";
 
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            container.style.backgroundColor = "#1e1f20";
+        // Match the user-provided native class style: conversation-actions-menu-button
+        container.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            margin-right: 8px;
+            background-color: transparent;
+            border: none;
+            border-radius: 100px;
+            font-family: "Google Sans", Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            color: #444746;
+            cursor: pointer;
+            user-select: none;
+            height: 40px;
+            transition: background-color 0.2s;
+            outline: none;
+        `;
+
+        const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (isDark) {
             container.style.color = "#e3e3e3";
-            container.style.borderColor = "#444746";
         }
+
+        container.onmouseenter = () => {
+            container.style.backgroundColor = isDark ? "rgba(227, 227, 227, 0.08)" : "rgba(68, 71, 70, 0.08)";
+        };
+        container.onmouseleave = () => {
+            container.style.backgroundColor = "transparent";
+        };
 
         const icon = document.createElement("span");
         icon.textContent = "✧";
-        icon.style.marginRight = "6px";
+        icon.style.marginRight = "8px";
         icon.style.color = "#1a73e8";
+        icon.style.fontSize = "18px";
+        icon.style.display = "flex";
+        icon.style.alignItems = "center";
 
         const label = document.createElement("span");
-        label.className = "token-label";
+        label.className = "token-label conversation-title gds-title-m";
         label.textContent = "0 tokens";
         this.labelSpan = label;
 
@@ -109,13 +135,8 @@ export class GeminiHandler implements TokenHandler {
         container.appendChild(label);
         this.containerEl = container;
 
-        const micBtn = injectionPoint.querySelector(".speech_dictation_mic_button") ||
-            injectionPoint.querySelector("button[aria-label*='Voice']");
-        if (micBtn && micBtn.parentElement) {
-            micBtn.parentElement.insertBefore(container, micBtn);
-        } else {
-            injectionPoint.appendChild(container);
-        }
+        // 插入到容器最前方
+        injectionPoint.insertBefore(container, injectionPoint.firstChild);
     }
 
     private scheduleCompute(delay = 200) {
@@ -162,9 +183,11 @@ export class GeminiHandler implements TokenHandler {
 
     private getObserveTargets(): Node[] {
         const history = document.querySelector("#chat-history");
+        const header = document.querySelector(".buttons-container");
         const input = document.querySelector(".input-area-container");
         const targets: Node[] = [document.body];
         if (history) targets.push(history);
+        if (header) targets.push(header);
         if (input) targets.push(input);
         return targets;
     }
