@@ -198,7 +198,7 @@ function ensureUiMounted() {
   btn.id = BUTTON_ID;
   btn.type = "button";
   btn.className =
-    "btn relative btn-ghost text-token-text-primary ml-2 flex items-center gap-1";
+    "btn relative btn-ghost text-token-text-primary hover:bg-token-surface-hover keyboard-focused:bg-token-surface-hover rounded-lg max-sm:hidden";
 
   const label = document.createElement("span");
   label.textContent = "0.0k tokens";
