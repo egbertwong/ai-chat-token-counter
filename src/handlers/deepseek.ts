@@ -14,6 +14,8 @@ export class DeepSeekHandler implements TokenHandler {
     private observeTargets: Node[] = [];
     private urlCheckTimer: number | null = null;
     private lastHref = location.href;
+    private cachedButtonWidth = 0;
+    private uploadButtonRef: HTMLElement | null = null;
 
     async init() {
         try {
@@ -112,11 +114,9 @@ export class DeepSeekHandler implements TokenHandler {
         if (existing) {
             this.containerEl = existing as HTMLElement;
             this.labelSpan = existing.querySelector(".token-label");
-
-            // Update position based on upload button (closer spacing)
-            const rect = uploadButton.getBoundingClientRect();
-            existing.style.left = `${rect.left - existing.offsetWidth - 8}px`;
-            existing.style.top = `${rect.top}px`;
+            this.uploadButtonRef = uploadButton;
+            // Update position and recalculate width
+            this.updateButtonPosition();
             return;
         }
 
@@ -174,6 +174,7 @@ export class DeepSeekHandler implements TokenHandler {
         button.appendChild(focusRing);
 
         this.containerEl = button;
+        this.uploadButtonRef = uploadButton;
 
         // Append to body
         document.body.appendChild(button);
@@ -187,21 +188,38 @@ export class DeepSeekHandler implements TokenHandler {
         });
 
         // Set initial position after button is rendered and has width
+        // Cache the button width to avoid recalculation during hover
+        let cachedButtonWidth = 0;
         requestAnimationFrame(() => {
-            const rect = uploadButton.getBoundingClientRect();
-            button.style.left = `${rect.left - button.offsetWidth - 8}px`;
-            button.style.top = `${rect.top}px`;
+            const uploadRect = uploadButton.getBoundingClientRect();
+            cachedButtonWidth = button.offsetWidth;
+            // Position based on upload button's position, accounting for our button width + gap
+            button.style.left = `${uploadRect.left - cachedButtonWidth - 8}px`;
+            button.style.top = `${uploadRect.top}px`;
         });
 
-        // Update position on scroll/resize
+        // Update position on scroll/resize (use cached width to avoid jumps)
         const updatePosition = () => {
-            const newRect = uploadButton.getBoundingClientRect();
-            button.style.left = `${newRect.left - button.offsetWidth - 8}px`;
-            button.style.top = `${newRect.top}px`;
+            const uploadRect = uploadButton.getBoundingClientRect();
+            // Use cached width instead of recalculating to avoid hover-induced jumps
+            button.style.left = `${uploadRect.left - cachedButtonWidth - 8}px`;
+            button.style.top = `${uploadRect.top}px`;
         };
 
         window.addEventListener('scroll', updatePosition, { passive: true });
         window.addEventListener('resize', updatePosition, { passive: true });
+    }
+
+    private updateButtonPosition() {
+        if (!this.containerEl || !this.uploadButtonRef) return;
+
+        // Recalculate button width (in case content changed)
+        this.cachedButtonWidth = this.containerEl.offsetWidth;
+
+        // Update position
+        const uploadRect = this.uploadButtonRef.getBoundingClientRect();
+        this.containerEl.style.left = `${uploadRect.left - this.cachedButtonWidth - 8}px`;
+        this.containerEl.style.top = `${uploadRect.top}px`;
     }
 
     private scheduleCompute(delay = 200) {
@@ -266,6 +284,9 @@ export class DeepSeekHandler implements TokenHandler {
             } else {
                 this.labelSpan.textContent = `${totalTokens} tokens`;
             }
+
+            // Update button position after text change (width may have changed)
+            this.updateButtonPosition();
         } catch (e) {
             console.error("[DeepSeekToken] error:", e);
             if (this.labelSpan) this.labelSpan.textContent = "Error";
