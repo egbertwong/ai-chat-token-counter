@@ -1,7 +1,7 @@
 {
-  "name": "chatgpt-token-ext",
+  "name": "ai-chat-token-counter",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI Chat Token Counter - Real-time token counting for ChatGPT, Gemini, and DeepSeek",
   "main": "index.js",
   "scripts": {
     "build": "node esbuild.config.mjs",
