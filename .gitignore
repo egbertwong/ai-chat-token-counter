@@ -28,6 +28,12 @@ esm/
 coverage/
 .nyc_output/
 
+# Test output files (temporary debugging)
+test-*.txt
+test-output.txt
+test-results.txt
+test-error.txt
+
 # Frameworks / caches
 .next/
 .nuxt/
