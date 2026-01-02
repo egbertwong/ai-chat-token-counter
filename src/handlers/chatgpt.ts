@@ -2,7 +2,7 @@ import { getEncoding } from "js-tiktoken";
 import { BaseHandler } from "../core/BaseHandler";
 import { formatTokenCount } from "../utils/format";
 
-const KEY = "egbertw_token_encoder";
+const KEY = "ai_chat_token_encoder";
 const BUTTON_ID = "token-counter-button";
 const LABEL_ATTRIBUTE = "data-token-counter-label";
 const DEBUG_LOG = false;
